@@ -87,11 +87,15 @@ def main() -> None:
         plddt = clamp(72 + 9 * q + rng.gauss(0, 4), 40, 98)
         pae = clamp(12 - 4.2 * q + rng.gauss(0, 2.2), 1.5, 30)
         iptm = clamp(0.55 + 0.14 * q + rng.gauss(0, 0.07), 0.05, 0.97)
-        rmsd = clamp(2.2 - 0.7 * q + rng.gauss(0, 0.6), 0.3, 8.0)
-        mpnn = clamp(1.25 - 0.22 * q + rng.gauss(0, 0.18), 0.4, 2.6)
+        rmsd = clamp(2.1 - 0.22 * q + rng.gauss(0, 0.9), 0.3, 8.0)
+        mpnn = clamp(1.2 - 0.05 * q + rng.gauss(0, 0.28), 0.4, 2.6)
         ddg = clamp(-22 - 7.5 * q + rng.gauss(0, 5), -60, 10)
         sasa = clamp(850 + 180 * q + rng.gauss(0, 140), 300, 2200)
-        sc = clamp(0.58 + 0.06 * q + rng.gauss(0, 0.04), 0.2, 0.85)
+        # shape_complementarity, rmsd and mpnn are only weakly tied to the
+        # latent quality here -- they make decent gates but carry little
+        # ranking signal, so the calibration step can show how to down-weight
+        # metrics that turn out not to predict binding.
+        sc = clamp(0.60 + 0.012 * q + rng.gauss(0, 0.055), 0.2, 0.85)
         # pH selectivity is only weakly tied to quality -- it's a separate ask.
         ph_sel = clamp(3.5 + 2.0 * q + rng.gauss(0, 3.0), 0.4, 25)
 

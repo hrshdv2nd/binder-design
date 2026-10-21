@@ -180,6 +180,76 @@ def write_plate_csv(result: TriageResult, path: Path) -> None:
                         c.length, c.sequence])
 
 
+# --------------------------------------------------------------------------- #
+# Calibration figures (the feedback loop)
+# --------------------------------------------------------------------------- #
+def plot_calibration_auroc(report, path: Path) -> None:
+    """How well each metric separated real binders (AUROC, oriented)."""
+    ms = report.metrics
+    if not ms:
+        return
+    labels = [m.name for m in ms]
+    vals = [m.auroc for m in ms]
+    colors = [C_PASS if v >= 0.6 else (C_ACCENT if v >= 0.55 else C_INPUT)
+              for v in vals]
+    fig, ax = plt.subplots(figsize=(8, max(3, 0.5 * len(ms) + 1.5)))
+    ypos = np.arange(len(labels))[::-1]
+    ax.barh(ypos, vals, color=colors, height=0.6)
+    ax.axvline(0.5, color=C_REJECT, ls="--", lw=1, label="no signal (0.5)")
+    for y, v in zip(ypos, vals):
+        ax.text(v + 0.005, y, f"{v:.2f}", va="center", fontsize=9)
+    ax.set_yticks(ypos); ax.set_yticklabels(labels)
+    ax.set_xlim(0.4, max(0.75, max(vals) + 0.05))
+    ax.set_xlabel("AUROC — binder vs non-binder (higher = more predictive)")
+    ax.set_title("Which metrics actually predicted binding")
+    ax.legend(loc="lower right", fontsize=8)
+    ax.spines[["top", "right"]].set_visible(False)
+    fig.tight_layout(); fig.savefig(path, dpi=130); plt.close(fig)
+
+
+def plot_weight_shift(report, path: Path) -> None:
+    """Config's guessed weights vs the calibration's data-driven suggestion."""
+    ms = report.metrics
+    if not ms:
+        return
+    labels = [m.name for m in ms]
+    cur = [m.current_weight for m in ms]
+    sug = [m.suggested_weight for m in ms]
+    x = np.arange(len(labels))
+    fig, ax = plt.subplots(figsize=(10, 4.6))
+    ax.bar(x - 0.2, cur, 0.4, label="config (guessed)", color=C_INPUT)
+    ax.bar(x + 0.2, sug, 0.4, label="suggested (from data)", color=C_SELECT)
+    ax.set_xticks(x); ax.set_xticklabels(labels, rotation=45, ha="right", fontsize=8)
+    ax.set_ylabel("scoring weight")
+    ax.set_title("Reweighting: what the assay says to trust")
+    ax.legend(fontsize=9)
+    ax.spines[["top", "right"]].set_visible(False)
+    fig.tight_layout(); fig.savefig(path, dpi=130); plt.close(fig)
+
+
+def write_calibration_markdown(report, path: Path, figures: list[str]) -> None:
+    lines = [f"# Calibration report — {report.target_name}\n"]
+    lines.append(f"- Designs matched to assay results: **{report.n_matched}**")
+    lines.append(f"- Measured binders: **{report.n_binders}** "
+                 f"({100*report.n_binders/max(report.n_matched,1):.0f}%)\n")
+    lines.append("## Per-metric discrimination\n")
+    lines.append("| metric | AUROC | discrimination | Spearman vs pKd | weight → suggested |")
+    lines.append("|--------|-------|----------------|-----------------|--------------------|")
+    for m in report.metrics:
+        sp = "—" if m.spearman_pkd != m.spearman_pkd else f"{m.spearman_pkd:.2f}"
+        lines.append(f"| {m.name} | {m.auroc:.2f} | {m.discrimination:.2f} | {sp} | "
+                     f"{m.current_weight:.2f} → **{m.suggested_weight:.2f}** |")
+    lines.append("\n## Suggested config update\n")
+    lines.append("```yaml")
+    lines.append(report.weight_yaml())
+    lines.append("```\n")
+    if figures:
+        lines.append("## Figures\n")
+        for f in figures:
+            lines.append(f"![{f}]({f})\n")
+    path.write_text("\n".join(lines))
+
+
 def write_markdown(result: TriageResult, path: Path, figures: list[str]) -> None:
     tgt = result.target
     lines: list[str] = []

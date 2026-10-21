@@ -33,9 +33,18 @@ expensive, so you spend compute to avoid spending lab wells:
 ```
 
 A biotech's edge is **not** running one more RFdiffusion job. It's the triage
-logic in the middle: trustworthy gates, a scoring function that weights metrics
+logic in the middle — trustworthy gates, a scoring function that weights metrics
 by how predictive they actually are, and diversity so one bad backbone doesn't
-sink the whole plate. That is what this repo implements and documents.
+sink the whole plate — **plus the feedback loop** that uses each plate's measured
+Kd values to recalibrate which metrics to trust next time. That compounding loop
+is the real moat, and it's what this repo implements and documents.
+
+```
+  ... VALIDATE  ──►  CALIBRATE  ──►  edit weights  ──┐
+      Adaptyv Kd     which metrics   in the config   │  next plate ranked
+                     actually                        └─ by what worked
+                     predicted binding
+```
 
 ---
 
@@ -45,10 +54,12 @@ sink the whole plate. That is what this repo implements and documents.
 |------|-----------|
 | `config/targets/egfr.yaml` | The whole target definition — epitope, metrics, thresholds, weights, plate settings. **Retarget by copying this file.** |
 | `src/binder_triage/` | The engine: `schema` → `filters` (gate) → `scoring` (rank) → `diversity` (select) → `triage` (orchestrate) → `report` (plots). |
+| `src/binder_triage/calibration.py` | The **feedback loop** — scores how well each metric predicted measured binding (AUROC / Spearman) and proposes new weights. |
 | `scripts/generate_demo_data.py` | Reproducible synthetic candidate generator. |
-| `data/candidates_demo.csv` | 600 example designs. |
-| `outputs/` | Report, plate CSV, and four figures from the last run. |
-| `docs/` | The learning material — workflow, metrics, and the Adaptyv mapping. |
+| `scripts/generate_demo_results.py` | Synthetic "assay results" so the calibration loop runs end-to-end. |
+| `data/candidates_demo.csv`, `data/results_demo.csv` | 600 example designs and their (synthetic) measured outcomes. |
+| `outputs/` | Report, plate CSV, and figures — including `calibration/`. |
+| `docs/` | The learning material — workflow, metrics, Adaptyv mapping, and the calibration loop. |
 | `tests/` | Unit tests for every stage. |
 
 ---
@@ -68,7 +79,22 @@ PYTHONPATH=src python -m binder_triage.cli \
     --outdir outputs
 
 # 3. read outputs/report.md and look at the figures
+
+# 4. close the loop: calibrate metric weights against measured binding
+python scripts/generate_demo_results.py --out data/results_demo.csv
+PYTHONPATH=src python -m binder_triage.calibrate_cli \
+    --target config/targets/egfr.yaml \
+    --candidates data/candidates_demo.csv \
+    --results data/results_demo.csv \
+    --outdir outputs/calibration
 ```
+
+**Where do the Kd / binding labels come from?** A wet lab — nothing in silico
+produces them. For learning right now, Adaptyv publishes real measured binding
+for hundreds of EGFR designs ([round 1](https://github.com/adaptyvbio/egfr_competition),
+[round 2](https://github.com/adaptyvbio/egfr_competition_2)); for your own designs,
+submitting to the competition or using Adaptyv's lab / a CRO returns BLI/SPR Kd.
+See `docs/04_calibration.md` for the full table and the results-file format.
 
 You'll get a funnel chart, a rejection breakdown, the **design landscape**
 (pAE vs ddG — the chart that decides everything), a score-contribution
