@@ -1,0 +1,142 @@
+# ---------------------------------------------------------------------------
+# Target definition: EGFR (Epidermal Growth Factor Receptor)
+#
+# This is the flagship target of the Adaptyv Bio protein design competitions
+# (2024 round 1, 2024/25 round 2, and Challenge 1 of the 2026 Anthropic x
+# Adaptyv competition, which adds a pH-conditional twist).
+#
+# Everything the triage engine needs about a target lives in a file like this.
+# To retarget the whole system at, say, TfR1 or a viral glycoprotein, copy this
+# file and change the values -- no code changes required.
+# ---------------------------------------------------------------------------
+name: EGFR
+full_name: Epidermal Growth Factor Receptor
+uniprot: P00533
+# Domain III of the ectodomain is the ligand-binding / cetuximab epitope most
+# binder-design campaigns aim at.
+reference_structures:
+  - pdb: 1YY9       # EGFR ectodomain in complex with Cetuximab Fab
+    note: canonical cetuximab epitope on domain III
+  - pdb: 6ARU       # EGFR domain III, useful as a design target surface
+    note: domain III surface
+epitope:
+  description: >
+    Domain III ligand-binding face overlapping the cetuximab epitope. Hotspot
+    residues are where the designed binder should make its key contacts.
+  hotspot_residues: [D355, F357, Q384, Q408, H409, K443, K465]
+
+reference_binder:
+  name: Cetuximab (scFv format)
+  kd_nm: 9.94           # affinity of the reference, from Adaptyv round 2 reporting
+  note: >
+    Competition designs had to differ from known therapeutic binders in >=10
+    positions. The best de novo win reached ~1.21 nM (Cradle, round 2).
+
+# Optional challenge-specific constraint. The 2026 Challenge 1 asks for binding
+# that switches ON in the acidic tumour microenvironment (~pH 6.5) and OFF at
+# healthy-tissue pH (~7.4). We model this as a measurable selectivity window.
+conditional:
+  enabled: true
+  description: pH-conditional binding - engage tumour (acidic), spare healthy tissue
+  on_ph: 6.5
+  off_ph: 7.4
+  # minimum fold-change in predicted affinity between on/off pH to count
+  min_selectivity_fold: 5.0
+
+# ---------------------------------------------------------------------------
+# Metric specifications.
+#
+# Each metric a design model emits is declared once here. The triage engine is
+# generic; it reads these specs to know, for every metric:
+#   direction      : is a higher or lower value better?
+#   hard_min/max   : gatekeeping threshold -- a design failing it is rejected
+#                    outright regardless of how good everything else looks
+#   weight         : contribution to the composite rank score (0 = not scored,
+#                    only used as a gate or for reporting)
+#   unit / about   : human-readable context for the docs and report
+# ---------------------------------------------------------------------------
+metrics:
+  plddt:
+    about: AlphaFold2/ESMFold confidence in the folded binder (0-100). Proxy for "will it fold".
+    direction: higher
+    hard_min: 80
+    weight: 1.0
+    unit: score
+
+  pae_interaction:
+    about: Predicted aligned error across the binder-target interface (Angstrom). The single most predictive in-silico metric for real binding.
+    direction: lower
+    hard_max: 10.0
+    weight: 2.5
+    unit: angstrom
+
+  iptm:
+    about: AlphaFold interface pTM for the complex (0-1). Confidence the two chains are docked correctly.
+    direction: higher
+    hard_min: 0.50
+    weight: 1.5
+    unit: score
+
+  rmsd_design:
+    about: Backbone RMSD between the AF2-refolded binder and the design model (Angstrom). Self-consistency check.
+    direction: lower
+    hard_max: 2.0
+    weight: 1.0
+    unit: angstrom
+
+  mpnn_score:
+    about: ProteinMPNN negative log-likelihood of the sequence given the backbone (lower = sequence fits the fold better).
+    direction: lower
+    hard_max: 1.5
+    weight: 0.5
+    unit: nats
+
+  ddg:
+    about: Rosetta/PyRosetta predicted binding free energy (REU). Strongly negative = tighter predicted binding.
+    direction: lower
+    hard_max: -20.0
+    weight: 2.0
+    unit: REU
+
+  interface_sasa:
+    about: Buried solvent-accessible surface area at the interface (Angstrom^2). Larger well-packed interfaces tend to bind.
+    direction: higher
+    hard_min: 800
+    weight: 1.0
+    unit: angstrom^2
+
+  shape_complementarity:
+    about: Lawrence-Colman shape complementarity of the interface (0-1).
+    direction: higher
+    hard_min: 0.55
+    weight: 1.0
+    unit: score
+
+  ph_selectivity_fold:
+    about: Predicted affinity fold-change between off-pH (7.4) and on-pH (6.5). Only meaningful for the conditional challenge.
+    direction: higher
+    hard_min: 5.0
+    weight: 1.5
+    unit: fold
+    conditional_only: true
+
+# ---------------------------------------------------------------------------
+# Developability liabilities. These are binary red flags checked separately
+# from the scored metrics. Any flag set rejects the design from the plate
+# (biotechs would rather not burn a well on something that won't express or
+# will aggregate), but they are reported so the user can override.
+# ---------------------------------------------------------------------------
+liabilities:
+  - free_cysteine        # unpaired Cys -> disulfide scrambling / dimerisation
+  - n_glyc_motif         # N-X-S/T sequon -> unwanted glycosylation
+  - high_hydrophobicity  # SAP/aggregation risk
+  - long_unstructured     # disordered loops, poor expression
+
+# ---------------------------------------------------------------------------
+# Plate / selection settings -- how many designs go to the wet lab and how
+# much sequence diversity we insist on among them.
+# ---------------------------------------------------------------------------
+selection:
+  plate_size: 96                 # one 96-well plate of candidates to order
+  diversity_identity_cutoff: 0.9 # sequences >=90% identical are the "same" cluster
+  max_per_cluster: 3             # cap near-duplicates so the plate explores broadly

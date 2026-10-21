@@ -1,0 +1,11 @@
+# suggested scoring weights from calibration
+# (paste each into the matching metric in the target YAML)
+ddg: 1.96   # was 2.00, AUROC 0.81
+iptm: 1.94   # was 1.50, AUROC 0.81
+pae_interaction: 1.92   # was 2.50, AUROC 0.81
+plddt: 1.89   # was 1.00, AUROC 0.80
+interface_sasa: 1.69   # was 1.00, AUROC 0.77
+ph_selectivity_fold: 1.27   # was 1.50, AUROC 0.70
+shape_complementarity: 0.73   # was 1.00, AUROC 0.62
+rmsd_design: 0.56   # was 1.00, AUROC 0.59
+mpnn_score: 0.04   # was 0.50, AUROC 0.51
