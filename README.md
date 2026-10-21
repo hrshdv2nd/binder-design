@@ -74,6 +74,17 @@ You'll get a funnel chart, a rejection breakdown, the **design landscape**
 (pAE vs ddG — the chart that decides everything), a score-contribution
 breakdown, `report.md`, and `selected_plate.csv` — the shortlist you'd order.
 
+### Interactive explorer
+
+`web/triage_explorer.html` is a self-contained interactive version: drag the
+gate thresholds and metric weights and watch the funnel, the design landscape,
+and the shortlist update live over the 600-design demo set. Open the file in a
+browser, or rebuild it after changing the data with:
+
+```bash
+python scripts/build_explorer.py   # reads data/designs.json -> web/triage_explorer.html
+```
+
 ---
 
 ## The three triage stages (and why they're separate)
